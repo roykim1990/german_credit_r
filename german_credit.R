@@ -22,8 +22,7 @@ action <- function(data){
 # modelop.metrics
 metrics <- function(data){
     df <- data.frame(data)
-    get_metrics <- metric_set(recall, precision, f_meas, accuracy, 
-        kap, sensitivity, specificity)
+    get_metrics <- metric_set(f_meas, accuracy, sensitivity, specificity, precision)
     output <- get_metrics(data=df, truth=X0.label_value, estimate=X0.score)
     emit(output)
 }
