@@ -104,7 +104,6 @@ save(logreg_fit, file="trained_model.RData")
 # importing necessary libraries
 library(tidymodels)
 library(readr)
-library(yardstick)
 library(jsonlite)
 
 # importing test data (flatten to prevent nesting)
