@@ -1,15 +1,15 @@
 # german_credit_r
-A sample data science project that uses a Logitistic Regression model built in R to predict default or pay off of loands from the German Credit dataset. Specifically, this example is used to demonstrate the creating of ModelOp Center(MOC)-compliant code.
+A sample data science project that uses a Logitistic Regression model built in R to predict default or pay off of loans from the German Credit dataset. Specifically, this example is used to demonstrate the creating of ModelOp Center(MOC)-compliant code.
 
 ## Assets:
 - `german_credit.R` is the R code that houses the MOC-compliant code to predict and get metrics on data.
-- `trained_model.RData` is the trained model artifact that is loaded upon prediction. In our case, the artifact is a workflow built on top of a recipe that includes a few data cleaning steps and a call to a linear regression model.
+- `trained_model.RData` is the trained model artifact that is loaded upon prediction. In our case, the artifact is a workflow built on top of a recipe that includes a few data cleaning steps and a call to a logistic regression model.
 - The datasets used for **scoring** are `df_baseline.json` and `df_sample.json`. These datasets represent raw data that would first be run into a batch scoring job. A sample of the outcome to the scoring job is provided in the `output_action_sample.json` file.
 - The datasets for **metrics** are `df_baseline_scored.json` and `df_sample_scored.json`. These datasets represent data that has appended the predictions from a scoring job. The columns are renamed to be compliant with MOC; `label` is renamed to `label_value` and the prediction column is named `score`.
 
 ## Directions:
-1. For a **scoring** job, use the `df_baseline.json` or the `df_sample.json` files. The output is a JSON string object that has the orignal `label` and `.pred_class` for each input row.
-2. For a **metrics** job, use the `df_baseline_scored.json` or the `df_sample_scored.json` files. THe output is a list of the relevant metrics (F1 score, Accuracy, Sensitivity, Specificity, Precision) for the classification model.
+1. For a **scoring** job, use the `df_baseline.json` or the `df_sample.json` files. The output is a JSON string object that has the orignal `label` and `.pred_class` for each input row. `output_action_sample.json` is the output of the scoring job run on the `df_sample.json` file. 
+2. For a **metrics** job, use the `df_baseline_scored.json` or the `df_sample_scored.json` files. THe output is a list of the relevant metrics (F1 score, Accuracy, Sensitivity, Specificity, Precision) for the classification model. `output_metrics_sample.json` is the output of the metrics job run on the `df_sample_scored.json` file.
 
 The input data to the **scoring** job is `df_sample.json`, which is a JSONS file (one-line JSON records). Here are the first three records:
 ```json
