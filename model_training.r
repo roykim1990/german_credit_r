@@ -105,15 +105,17 @@ save(logreg_fit, file="trained_model.RData")
 library(tidymodels)
 library(readr)
 library(yardstick)
+library(jsonlite)
+
+# importing test data (flatten to prevent nesting)
+data_in <- stream_in(file("df_sample.json"),flatten = TRUE)
+test_data <- tibble(data_in)
 
 # loading fit model
 load("trained_model.RData")
 
 # re-assigning model for clarity
 model <- logreg_fit
-
-# loading test data
-test_data <- read_json("df_sample.json")
 
 # predicting
 predict(model, test_data)
