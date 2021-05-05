@@ -1,0 +1,185 @@
+---
+title: "German Credit Model Training Notebook"
+output: html_document
+---
+
+# German Credit model training
+This notebook will be a guide in creating a Logistic Regression model on the German Credit dataset. The output of this notebook will be a trained model artifact that will be called on model runtime, as well as creating sample datasets that are MOC-compliant.
+
+## Library imports
+First, let's import our the necessary libraries
+```{r eval=FALSE}
+library(tidymodels)
+library(readr)
+library(yardstick)
+library(jsonlite)
+library(purrr)
+library(stringr)
+library(xgboost)
+library(dplyr)
+```
+
+MOC best works with one-line JSON string objects. Since there isn't native support for one-line JSON string objects, we'll be using the following code to write json files based on the dataframes that are put in.
+
+```{r}
+# function to write json files
+write_json <- function(object, filename){
+    s <- toJSON(object)
+    s <- substring(s, 2, nchar(s) - 1)
+    s <- str_replace_all(s, "\\},", "\\}\n")
+    write(s, filename)
+}
+```
+
+## Preparing the data
+Let's import the data. This specific version of the German Credit dataset has a `label` column that specifies whether or not someone defaulted or paid off the loan. 
+
+```{r}
+df = readr::read_csv("german_credit_data.csv")
+```
+
+For classification models in R, we need the outcome variable to be a factor type. Currently, `label` is 0s and 1s, so we'll edit this.
+
+```{r}
+# converting 0,1s in label to string counterparts and then to factor
+df <- transform(df, label = ifelse((label>0), "Default", "Pay Off"))
+df <- df %>% mutate(label = factor(label))
+```
+
+Let's also set a random seed for reproducibility
+```{r}
+set.seed(777)
+```
+
+## Preparing for preprocessing
+At this point, we'll be splitting the dataset into train/test datasets. We'll also want to save these datasets as the one-line JSON object files so we can run them on MOC.
+
+```{r}
+# train/test split
+df_split <- initial_split(df, prop=0.8, strata=label)
+df_baseline <- training(df_split)
+df_sample <- testing(df_split)
+
+glimpse(df_baseline)
+```
+Saving the datasets:
+```{r}
+# save the train and test data for later use
+write_json(df_baseline, 'df_baseline.json')
+write_json(df_sample, 'df_sample.json')
+```
+
+## Preprocessing and Feature Engineering
+Now that the datasets are saved, let's get into preprocessing the data. We'll be using a recipe to conform the data in a workflow, which will allow us to seamlessly input data into MOC, as well. Here are the steps our recipe:
+- First, we'll want to drop the `id` and `gender` columns, as incorporating these into the model would be detrimental and introduce bias. We will want the `gender` column later as we do bias monitoring.
+- Next, we'll dummy the nominal features.
+- After, we'll drop columns with 0 variance. This specific dataset doesn't have any of features with 0 variance, but it might be good practice to put it in there anyway.
+- Finall, we'll normalize all the predictor features to have a mean of 0 and a standard deviation of 1.
+
+```{r}
+gc_recipe <-
+    # selecting all columns to predict `label`  
+    recipe(label ~ ., data=df_baseline) %>%
+    # removing the id and gender columns from being predictive variables
+    step_rm(id, gender) %>% 
+    # dummying all categorical features
+    step_dummy(all_nominal(), -all_outcomes()) %>%
+    # dropping columns with 0 variance ie. are only one value
+    step_zv(all_predictors()) %>%
+    # normalizing all columns to have a mean of 0, std of 1
+    step_normalize(all_predictors())
+
+# check out summary of recipe
+summary(gc_recipe)
+```
+
+## Model Training
+Now that the data is ready, let's instantiate our model and create the workflow. We'll be using a simple logistic regression model for our purposes, and the workflow will just simply include the reciple and the model
+
+```{r}
+# fitting the model, simple logistic regression
+logreg <- logistic_reg(penalty=tune(), mixture=tune()) %>% 
+    set_engine("glm") %>%
+    set_mode("classification")
+
+# creating workflow by combining recipe and model
+logreg_wflow <-
+    workflow() %>%
+    add_model(logreg) %>%
+    add_recipe(gc_recipe)
+```
+
+Let's go ahead and fit the model. This will be the trained model artifact that we'll want to save later.
+```{r}
+# training the model
+logreg_fit <- fit(logreg_wflow, df_baseline)
+```
+
+Let's make predictions on both the training dataset and the testing dataset. We'll add these back into the origal dataset, as the monitoring portion of MOC needs predictions to test against the actual ground truth labels.
+
+```{r}
+# predicting on baseline and sample data
+train_preds <- predict(logreg_fit, df_baseline)
+test_preds <- predict(logreg_fit, df_sample)
+
+# binding predictions to original dataframes
+df_baseline_scored <- bind_cols(train_preds, df_baseline)
+df_sample_scored <- bind_cols(test_preds, df_sample)
+
+glimpse(df_baseline_scored)
+```
+
+## Evaluating the Model
+Now that predictions have been made, let's evaluate our model. We'll go with a standard set of metrics to evaluate: finding the best one for your own needs is obviously imperative for your own business use case.
+
+```{r}
+# evaluate outcomes
+metrics <- metric_set(recall, precision, f_meas, accuracy, kap)
+metrics(df_baseline_scored, truth=label, estimate=.pred_class)
+metrics(df_sample_scored, truth=label, estimate=.pred_class)
+```
+
+Not the best model, but the purpose of this notebook is just to get the trained model artifacts in order to run on MOC. We'll contend with this model.
+
+## Saving the Artifacts
+Let's go ahead and save all the necessary artifacts: our datasets with predictions (also with some columns renamed to be MOC-compliant - this is a crucial step), and our trained model artifact (the fit workflow).
+
+```{r}
+# rename columns: label -> label_value, .pred -> score
+df_baseline_scored <- rename(df_baseline_scored, label_value=label, score=.pred_class) %>% relocate(label_value, score)
+df_sample_scored <- rename(df_sample_scored, label_value=label, score=.pred_class) %>% relocate(label_value, score)
+
+# save "scored" dataframes for later analysis
+write_json(df_baseline_scored, "df_baseline_scored.json")
+write_json(df_sample_scored, "df_sample_scored.json")
+
+# persisting the fit model (the trained workflow)
+save(logreg_fit, file="trained_model.RData")
+```
+
+And that's a wrap! The code below can be used as a stand-alone to test the importing of the trained model artifact and data.
+
+```{r}
+# --------------------------------------------------------
+
+# testing loading and predicting with fit model
+# run below code without running above code to test
+
+# importing necessary libraries
+library(tidymodels)
+library(readr)
+library(jsonlite)
+
+# importing test data (flatten to prevent nesting)
+data_in <- stream_in(file("df_sample.json"),flatten = TRUE)
+test_data <- tibble(data_in)
+
+# loading fit model
+load("trained_model.RData")
+
+# re-assigning model for clarity
+model <- logreg_fit
+
+# predicting
+predict(model, test_data)
+```
