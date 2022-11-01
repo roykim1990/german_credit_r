@@ -1,7 +1,4 @@
 # import libraries
-packages <- c("readr", "tidymodels")
-install.packages(setdiff(packages, rownames(installed.packages())), repos="http://cran.us.r-project.org")
-
 library(tidymodels)
 library(readr)
 
