@@ -15,6 +15,7 @@ action <- function(data){
     preds <- predict(model, df)
     output <- list(label_value=df$label, score=preds$.pred_class)
     emit(output)
+}
 
 # modelop.metrics
 metrics <- function(data){
