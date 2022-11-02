@@ -21,6 +21,6 @@ action <- function(data){
 metrics <- function(data){
     df <- data.frame(data)
     get_metrics <- metric_set(f_meas, accuracy, sensitivity, specificity, precision)
-    output <- get_metrics(data=df, truth=X0.label_value, estimate=X0.score)
+    output <- get_metrics(data=df, truth=as.factor(label_value), estimate=as.factor(score))
     emit(output)
 }
