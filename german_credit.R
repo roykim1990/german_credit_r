@@ -1,7 +1,4 @@
 # import libraries
-packages <- c("readr", "tidymodels")
-install.packages(setdiff(packages, rownames(installed.packages())), repos="http://cran.us.r-project.org")
-
 library(tidymodels)
 library(readr)
 
@@ -18,11 +15,12 @@ action <- function(data){
     preds <- predict(model, df)
     output <- list(label_value=df$label, score=preds$.pred_class)
     emit(output)
+}
 
 # modelop.metrics
 metrics <- function(data){
     df <- data.frame(data)
     get_metrics <- metric_set(f_meas, accuracy, sensitivity, specificity, precision)
-    output <- get_metrics(data=df, truth=X0.label_value, estimate=X0.score)
+    output <- get_metrics(data=df, truth=as.factor(X0.label_value), estimate=as.factor(X0.score))
     emit(output)
 }
